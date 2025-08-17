@@ -456,6 +456,4 @@ This package is open-sourced software licensed under the [MIT license](LICENSE.m
 - Caching support
 - Security features
 
-## Support
 
-- 📧 Email: support@example.com
