@@ -4,18 +4,18 @@ A comprehensive route visualization package for Laravel applications that provid
 
 ## Features
 
-- 🌐 **Interactive Route Explorer**: Web-based dashboard with advanced search and filtering
-- 📊 **Network Graph Visualization**: Interactive network graphs using Vis.js for route relationships
-- 🌳 **Tree View**: Hierarchical visualization of route structure organized by prefixes
-- 📱 **Responsive Design**: Works perfectly on desktop and mobile devices with dark/light themes
-- 🔍 **Advanced Filtering**: Filter by HTTP methods, middleware, middleware groups, controllers, domains, namespaces, and more
-- ✅ **Route Validation**: Automatic detection of duplicate routes, missing controllers, and missing methods
-- 📤 **Export Capabilities**: Export filtered route data to HTML, JSON, or SVG formats
-- ⚡ **Performance Optimized**: Built-in caching, pagination, and lazy loading for large route sets
-- 🔒 **Security Aware**: Hide sensitive routes in production environments
-- 🎨 **Customizable**: Dark/light themes, configurable visualization options, and multiple templates
-- 📋 **Copy to Clipboard**: One-click copying of route URIs and controller actions
-- 🔭 **Laravel Telescope Integration**: Direct links to route performance data when Telescope is installed
+-  **Interactive Route Explorer**: Web-based dashboard with advanced search and filtering
+-  **Network Graph Visualization**: Interactive network graphs using Vis.js for route relationships
+-  **Tree View**: Hierarchical visualization of route structure organized by prefixes
+-  **Responsive Design**: Works perfectly on desktop and mobile devices with dark/light themes
+-  **Advanced Filtering**: Filter by HTTP methods, middleware, middleware groups, controllers, domains, namespaces, and more
+-  **Route Validation**: Automatic detection of duplicate routes, missing controllers, and missing methods
+-  **Export Capabilities**: Export filtered route data to HTML, JSON, or SVG formats
+-  **Performance Optimized**: Built-in caching, pagination, and lazy loading for large route sets
+-  **Security Aware**: Hide sensitive routes in production environments
+-  **Customizable**: Dark/light themes, configurable visualization options, and multiple templates
+-  **Copy to Clipboard**: One-click copying of route URIs and controller actions
+-  **Laravel Telescope Integration**: Direct links to route performance data when Telescope is installed
 
 ## Requirements
 
