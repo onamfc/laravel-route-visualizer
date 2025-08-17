@@ -98,14 +98,8 @@ class RouteVisualizerController
 
     public function graph(): JsonResponse
     {
-        $type = request()->get('type', 'vis');
         $routes = $this->routeScanner->scanRoutesCollection();
-
-        return match ($type) {
-            'd3' => $this->getD3GraphData($routes),
-            'mermaid' => $this->getMermaidGraphData($routes),
-            default => $this->getVisGraphData($routes),
-        };
+        return $this->getVisGraphData($routes);
     }
 
     protected function getVisGraphData(Collection $routes): JsonResponse
@@ -164,85 +158,6 @@ class RouteVisualizerController
         return response()->json([
             'nodes' => $nodes->values(),
             'edges' => $edges->values(),
-        ]);
-    }
-
-    protected function getD3GraphData(Collection $routes): JsonResponse
-    {
-        $nodes = [];
-        $links = [];
-        $nodeIndex = 0;
-        $nodeMap = [];
-
-        // Create controller nodes
-        $controllers = $routes->groupBy('controller.class')->keys()->filter();
-        foreach ($controllers as $controller) {
-            $nodeMap[$controller] = $nodeIndex;
-            $nodes[] = [
-                'id' => $nodeIndex++,
-                'name' => class_basename($controller),
-                'group' => 'controller',
-                'fullName' => $controller,
-            ];
-        }
-
-        // Create route nodes and links
-        foreach ($routes as $route) {
-            $routeNodeId = $nodeIndex++;
-            $nodes[] = [
-                'id' => $routeNodeId,
-                'name' => $route['uri'],
-                'group' => 'route',
-                'methods' => $route['methods'],
-            ];
-
-            // Link to controller
-            if (isset($route['controller']['class']) && isset($nodeMap[$route['controller']['class']])) {
-                $links[] = [
-                    'source' => $nodeMap[$route['controller']['class']],
-                    'target' => $routeNodeId,
-                    'value' => 1,
-                ];
-            }
-        }
-
-        return response()->json([
-            'nodes' => $nodes,
-            'links' => $links,
-        ]);
-    }
-
-    protected function getMermaidGraphData(Collection $routes): JsonResponse
-    {
-        $mermaidCode = "graph TD\n";
-        $controllers = $routes->groupBy('controller.class')->keys()->filter();
-
-        // Add controller nodes
-        foreach ($controllers as $index => $controller) {
-            $controllerId = "C{$index}";
-            $controllerName = class_basename($controller);
-            $mermaidCode .= "    {$controllerId}[{$controllerName}]\n";
-        }
-
-        // Add route nodes and connections
-        foreach ($routes as $index => $route) {
-            $routeId = "R{$index}";
-            $routeLabel = implode('|', $route['methods']) . ' ' . $route['uri'];
-            $mermaidCode .= "    {$routeId}[\"{$routeLabel}\"]\n";
-
-            // Connect to controller
-            if (isset($route['controller']['class'])) {
-                $controllerIndex = $controllers->search($route['controller']['class']);
-                if ($controllerIndex !== false) {
-                    $controllerId = "C{$controllerIndex}";
-                    $method = $route['controller']['method'] ?? '';
-                    $mermaidCode .= "    {$controllerId} --> {$routeId}\n";
-                }
-            }
-        }
-
-        return response()->json([
-            'mermaid' => $mermaidCode,
         ]);
     }
 

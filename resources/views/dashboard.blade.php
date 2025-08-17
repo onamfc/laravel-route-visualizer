@@ -9,12 +9,6 @@
     <!-- Vis.js for network visualization -->
     <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
 
-    <!-- D3.js for advanced visualizations -->
-    <script src="https://d3js.org/d3.v7.min.js"></script>
-
-    <!-- Mermaid for diagram generation -->
-    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
-
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     
@@ -22,14 +16,14 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     
     <style>
-        #route-network, #d3-network, #tree-view {
+        #route-network, #tree-view {
             height: 600px;
             border: 1px solid #e5e7eb;
             border-radius: 0.5rem;
             background: #f9fafb;
         }
         
-        .dark #route-network, .dark #d3-network, .dark #tree-view {
+        .dark #route-network, .dark #tree-view {
             background: #1f2937;
             border-color: #374151;
         }
@@ -84,6 +78,7 @@
         
         .tree-node text {
             font: 12px sans-serif;
+            fill: #374151;
         }
         
         .tree-link {
@@ -189,11 +184,9 @@
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Visualization Library</label>
-                        <select id="viz-library" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
-                            <option value="vis">Vis.js</option>
-                            <option value="d3">D3.js</option>
-                            <option value="mermaid">Mermaid</option>
-                        </select>
+                        <div class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-600 text-gray-900 dark:text-white">
+                            Vis.js Network Graph
+                        </div>
                     </div>
                     <div class="flex items-end">
                         <button id="apply-filters" class="w-full bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
@@ -302,8 +295,6 @@
                 <div id="graph-view" class="p-6 hidden">
                     <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Routes Network Graph</h2>
                     <div id="route-network"></div>
-                    <div id="d3-network" class="hidden"></div>
-                    <div id="mermaid-network" class="hidden"></div>
                 </div>
 
                 <!-- Tree View -->
@@ -332,7 +323,6 @@
                 this.setupEventListeners();
                 this.initializeTheme();
                 this.loadRoutes();
-                mermaid.initialize({ theme: 'default' });
             }
 
             setupEventListeners() {
@@ -360,10 +350,7 @@
             toggleTheme() {
                 const isDark = document.documentElement.classList.toggle('dark');
                 localStorage.setItem('route-visualizer-theme', isDark ? 'dark' : 'light');
-                
-                // Update mermaid theme
-                mermaid.initialize({ theme: isDark ? 'dark' : 'default' });
-                
+
                 // Re-render current view if it's a graph
                 const currentView = document.getElementById('view-mode').value;
                 if (currentView === 'graph') {
@@ -672,29 +659,15 @@
             }
 
             async renderGraph() {
-                const library = document.getElementById('viz-library').value;
-                
-                // Hide all graph containers
-                document.getElementById('route-network').classList.add('hidden');
-                document.getElementById('d3-network').classList.add('hidden');
-                document.getElementById('mermaid-network').classList.add('hidden');
+                const container = document.getElementById('route-network');
+                container.classList.remove('hidden');
 
                 try {
-                    const params = new URLSearchParams({ type: library, ...this.filters });
+                    const params = new URLSearchParams({ type: 'vis', ...this.filters });
                     const response = await fetch(`/{{ config("route-visualizer.route_prefix") }}/graph?${params}`);
                     const data = await response.json();
-                    
-                    switch (library) {
-                        case 'd3':
-                            await this.renderD3Graph(data);
-                            break;
-                        case 'mermaid':
-                            await this.renderMermaidGraph(data);
-                            break;
-                        default:
-                            await this.renderVisGraph(data);
-                            break;
-                    }
+
+                    await this.renderVisGraph(data);
                 } catch (error) {
                     console.error('Error rendering graph:', error);
                 }
@@ -702,7 +675,6 @@
 
             async renderVisGraph(data) {
                 const container = document.getElementById('route-network');
-                container.classList.remove('hidden');
                 
                 const options = {
                     nodes: {
@@ -748,94 +720,6 @@
                 });
             }
 
-            async renderD3Graph(data) {
-                const container = document.getElementById('d3-network');
-                container.classList.remove('hidden');
-                container.innerHTML = '';
-
-                const width = container.clientWidth;
-                const height = 600;
-
-                const svg = d3.select(container)
-                    .append('svg')
-                    .attr('width', width)
-                    .attr('height', height);
-
-                const simulation = d3.forceSimulation(data.nodes)
-                    .force('link', d3.forceLink(data.links).id(d => d.id))
-                    .force('charge', d3.forceManyBody().strength(-300))
-                    .force('center', d3.forceCenter(width / 2, height / 2));
-
-                const link = svg.append('g')
-                    .selectAll('line')
-                    .data(data.links)
-                    .enter().append('line')
-                    .attr('stroke-width', 2)
-                    .attr('stroke', '#999');
-
-                const node = svg.append('g')
-                    .selectAll('circle')
-                    .data(data.nodes)
-                    .enter().append('circle')
-                    .attr('r', 8)
-                    .attr('fill', d => d.group === 'controller' ? '#3B82F6' : '#10B981')
-                    .call(d3.drag()
-                        .on('start', dragstarted)
-                        .on('drag', dragged)
-                        .on('end', dragended));
-
-                const label = svg.append('g')
-                    .selectAll('text')
-                    .data(data.nodes)
-                    .enter().append('text')
-                    .text(d => d.name)
-                    .attr('font-size', 12)
-                    .attr('dx', 12)
-                    .attr('dy', 4)
-                    .attr('fill', document.documentElement.classList.contains('dark') ? '#e5e7eb' : '#333');
-
-                simulation.on('tick', () => {
-                    link
-                        .attr('x1', d => d.source.x)
-                        .attr('y1', d => d.source.y)
-                        .attr('x2', d => d.target.x)
-                        .attr('y2', d => d.target.y);
-
-                    node
-                        .attr('cx', d => d.x)
-                        .attr('cy', d => d.y);
-
-                    label
-                        .attr('x', d => d.x)
-                        .attr('y', d => d.y);
-                });
-
-                function dragstarted(event, d) {
-                    if (!event.active) simulation.alphaTarget(0.3).restart();
-                    d.fx = d.x;
-                    d.fy = d.y;
-                }
-
-                function dragged(event, d) {
-                    d.fx = event.x;
-                    d.fy = event.y;
-                }
-
-                function dragended(event, d) {
-                    if (!event.active) simulation.alphaTarget(0);
-                    d.fx = null;
-                    d.fy = null;
-                }
-            }
-
-            async renderMermaidGraph(data) {
-                const container = document.getElementById('mermaid-network');
-                container.classList.remove('hidden');
-                container.innerHTML = `<div class="mermaid">${data.mermaid}</div>`;
-                
-                await mermaid.init();
-            }
-
             async renderTree() {
                 try {
                     const response = await fetch(`/{{ config("route-visualizer.route_prefix") }}/tree-data`);
@@ -847,66 +731,55 @@
                     const width = container.clientWidth;
                     const height = 600;
 
-                    const svg = d3.select(container)
-                        .append('svg')
-                        .attr('width', width)
-                        .attr('height', height);
-
-                    const g = svg.append('g')
-                        .attr('transform', 'translate(40,0)');
-
-                    const tree = d3.tree()
-                        .size([height, width - 160]);
-
-                    const root = d3.hierarchy(this.convertToHierarchy(data.tree));
-                    tree(root);
-
-                    const link = g.selectAll('.tree-link')
-                        .data(root.descendants().slice(1))
-                        .enter().append('path')
-                        .attr('class', 'tree-link')
-                        .attr('d', d => {
-                            return `M${d.y},${d.x}C${(d.y + d.parent.y) / 2},${d.x} ${(d.y + d.parent.y) / 2},${d.parent.x} ${d.parent.y},${d.parent.x}`;
-                        });
-
-                    const node = g.selectAll('.tree-node')
-                        .data(root.descendants())
-                        .enter().append('g')
-                        .attr('class', 'tree-node')
-                        .attr('transform', d => `translate(${d.y},${d.x})`);
-
-                    node.append('circle')
-                        .attr('r', 6);
-
-                    node.append('text')
-                        .attr('dy', '.35em')
-                        .attr('x', d => d.children ? -13 : 13)
-                        .style('text-anchor', d => d.children ? 'end' : 'start')
-                        .text(d => d.data.name);
+                    // Simple tree visualization using HTML/CSS instead of D3
+                    this.renderSimpleTree(container, data.tree);
 
                 } catch (error) {
                     console.error('Error rendering tree:', error);
                 }
             }
 
-            convertToHierarchy(treeData) {
-                // Convert flat tree data to d3 hierarchy format
-                const root = { name: 'Routes', children: [] };
-                
+            renderSimpleTree(container, treeData) {
+                container.innerHTML = '';
+                const treeDiv = document.createElement('div');
+                treeDiv.className = 'p-4 space-y-4';
+
                 Object.values(treeData).forEach(node => {
                     if (node.routes && node.routes.length > 0) {
-                        const treeNode = {
-                            name: node.name || 'root',
-                            children: node.routes.map(route => ({
-                                name: `${route.methods.join('|')} ${route.uri}`,
-                                route: route
-                            }))
-                        };
-                        root.children.push(treeNode);
+                        const nodeDiv = document.createElement('div');
+                        nodeDiv.className = 'border border-gray-200 dark:border-gray-600 rounded-lg p-4 bg-gray-50 dark:bg-gray-700';
+                        
+                        const nodeTitle = document.createElement('h3');
+                        nodeTitle.className = 'font-semibold text-lg text-gray-900 dark:text-white mb-3';
+                        nodeTitle.textContent = node.name || 'Root';
+                        nodeDiv.appendChild(nodeTitle);
+
+                        const routesList = document.createElement('div');
+                        routesList.className = 'space-y-2';
+
+                        node.routes.forEach(route => {
+                            const routeDiv = document.createElement('div');
+                            routeDiv.className = 'flex items-center space-x-2 text-sm';
+                            
+                            const methodSpan = document.createElement('span');
+                            methodSpan.className = `px-2 py-1 rounded text-xs font-semibold method-${route.methods[0].toLowerCase()}`;
+                            methodSpan.textContent = route.methods.join('|');
+                            
+                            const uriSpan = document.createElement('span');
+                            uriSpan.className = 'font-mono text-gray-700 dark:text-gray-300';
+                            uriSpan.textContent = route.uri;
+                            
+                            routeDiv.appendChild(methodSpan);
+                            routeDiv.appendChild(uriSpan);
+                            routesList.appendChild(routeDiv);
+                        });
+
+                        nodeDiv.appendChild(routesList);
+                        treeDiv.appendChild(nodeDiv);
                     }
                 });
-                
-                return root;
+
+                container.appendChild(treeDiv);
             }
 
             showNotification(message, type = 'info') {

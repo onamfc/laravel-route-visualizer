@@ -5,7 +5,7 @@ A comprehensive route visualization package for Laravel applications that provid
 ## Features
 
 - **Interactive Route Explorer**: Web-based dashboard with advanced search and filtering
-- **Multiple Visualization Libraries**: Choose between Vis.js, D3.js, or Mermaid.js for network graphs
+- **Network Graph Visualization**: Interactive network graphs using Vis.js for route relationships
 - **Tree View**: Hierarchical visualization of route structure organized by prefixes
 - **Responsive Design**: Works perfectly on desktop and mobile devices with dark/light themes
 - **Advanced Filtering**: Filter by HTTP methods, middleware, middleware groups, controllers, domains, namespaces, and more
@@ -92,7 +92,6 @@ return [
     
     // Visualization library and options
     'visualization' => [
-        'library' => 'vis', // vis, d3, mermaid
         'theme' => 'light', // light, dark
         'layout' => 'hierarchical', // hierarchical, network
         'pagination' => [
@@ -153,7 +152,7 @@ The dashboard provides:
 - **Advanced Search & Filtering**: Real-time search with filters for methods, middleware, domains, namespaces, and more
 - **Multiple View Modes**: 
   - **List View**: Detailed tabular view with pagination and copy-to-clipboard functionality
-  - **Graph View**: Interactive network visualization using Vis.js, D3.js, or Mermaid.js
+  - **Graph View**: Interactive network visualization using Vis.js
   - **Tree View**: Hierarchical visualization organized by route structure
 - **Route Validation**: Visual indicators for duplicate routes, missing controllers, and missing methods
 - **Dark/Light Theme**: Toggle between themes with persistent preference
@@ -251,7 +250,7 @@ class YourController extends Controller
 The package provides several API endpoints:
 
 - `GET /route-visualizer/routes` - Get filtered route data with pagination
-- `GET /route-visualizer/graph` - Get network graph data (supports `?type=vis|d3|mermaid`)
+- `GET /route-visualizer/graph` - Get network graph data for Vis.js
 - `GET /route-visualizer/tree-data` - Get hierarchical tree data
 - `POST /route-visualizer/clear-cache` - Clear route cache
 
@@ -294,13 +293,14 @@ View::composer('route-visualizer::export.html', function ($view) {
 });
 ```
 
-### Visualization Libraries
+### Network Visualization
 
-Choose your preferred visualization library in the configuration:
+The package uses Vis.js for interactive network graphs that show relationships between routes and controllers. The visualization provides:
 
-- **Vis.js**: Best for interactive network graphs with good performance
-- **D3.js**: Most flexible with custom layouts and advanced interactions
-- **Mermaid.js**: Simple, text-based diagrams that are easy to understand
+- Interactive node dragging and zooming
+- Color-coded nodes for different types (controllers vs routes)
+- Validation status indicators (errors in red, warnings in yellow)
+- Hover tooltips with detailed information
 
 ## Security Considerations
 
@@ -435,7 +435,7 @@ This package is open-sourced software licensed under the [MIT license](LICENSE.m
 ## Changelog
 
 ### v2.0.0
-- **NEW**: Multiple visualization libraries (Vis.js, D3.js, Mermaid.js)
+- **NEW**: Interactive network visualization using Vis.js
 - **NEW**: Dark/light theme support with persistent preferences
 - **NEW**: Tree view for hierarchical route visualization
 - **NEW**: Advanced filtering by domain, namespace, and middleware groups

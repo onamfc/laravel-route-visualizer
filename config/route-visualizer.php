@@ -40,7 +40,6 @@ return [
     |--------------------------------------------------------------------------
     */
     'visualization' => [
-        'library' => 'vis', // vis, d3, mermaid
         'theme' => 'light', // light, dark
         'layout' => 'hierarchical', // hierarchical, network
         'pagination' => [

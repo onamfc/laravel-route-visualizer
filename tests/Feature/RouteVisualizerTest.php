@@ -91,22 +91,14 @@ class RouteVisualizerTest extends TestCase
     }
 
     /** @test */
-    public function can_get_d3_graph_data()
+    public function can_get_graph_data()
     {
-        $response = $this->get('/route-visualizer/graph?type=d3');
+        $response = $this->get('/route-visualizer/graph');
         $response->assertStatus(200);
         $response->assertJsonStructure([
             'nodes',
-            'links'
+            'edges'
         ]);
-    }
-
-    /** @test */
-    public function can_get_mermaid_graph_data()
-    {
-        $response = $this->get('/route-visualizer/graph?type=mermaid');
-        $response->assertStatus(200);
-        $response->assertJsonStructure(['mermaid']);
     }
 
     /** @test */
