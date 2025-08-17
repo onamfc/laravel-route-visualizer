@@ -434,7 +434,7 @@ This package is open-sourced software licensed under the [MIT license](LICENSE.m
 
 ## Changelog
 
-### v2.0.0
+### v1.1.0
 - **NEW**: Interactive network visualization using Vis.js
 - **NEW**: Dark/light theme support with persistent preferences
 - **NEW**: Tree view for hierarchical route visualization
