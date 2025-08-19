@@ -447,25 +447,3 @@ The package includes comprehensive feature and unit tests covering:
 ## License
 
 This package is open-sourced software licensed under the [MIT license](LICENSE.md).
-
-## Changelog
-
-### v1.0.0
-- **NEW**: Interactive network visualization using Vis.js
-- **NEW**: Tree view for hierarchical route visualization
-- **NEW**: Advanced filtering by domain, namespace, and middleware groups
-- **NEW**: Route validation with duplicate detection and missing controller/method checks
-- **NEW**: Copy to clipboard functionality for routes and controllers
-- **NEW**: Pagination and lazy loading for improved performance
-- **NEW**: Laravel Telescope integration with direct performance links
-- **NEW**: Enhanced export capabilities with filter support
-- **NEW**: Installation command for easy setup
-- **IMPROVED**: Enhanced UI with better responsive design
-- **IMPROVED**: More comprehensive statistics and analytics
-- **IMPROVED**: Better error handling and user feedback
-- Web dashboard with interactive visualization
-- Export functionality
-- Caching support
-- Security features
-
-
