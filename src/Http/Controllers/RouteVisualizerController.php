@@ -98,7 +98,7 @@ class RouteVisualizerController
 
     public function graph(): JsonResponse
     {
-        $routes = $this->routeScanner->scanRoutes();
+        $routes = $this->getFilteredRoutes(request());
 
         return $this->getVisGraphData($routes);
     }
@@ -164,7 +164,8 @@ class RouteVisualizerController
 
     public function treeData(): JsonResponse
     {
-        $treeData = $this->routeScanner->getTreeData();
+        $routes = $this->getFilteredRoutes(request());
+        $treeData = $this->getTreeDataFromRoutes($routes);
 
         return response()->json([
             'tree' => $treeData,
@@ -178,5 +179,91 @@ class RouteVisualizerController
         return response()->json([
             'message' => 'Route cache cleared successfully',
         ]);
+    }
+
+    protected function getFilteredRoutes(Request $request): Collection
+    {
+        $routes = $this->routeScanner->scanRoutes();
+
+        if ($request->has('search')) {
+            $search = $request->get('search');
+            $routes = $routes->filter(function ($route) use ($search) {
+                return str_contains($route['uri'], $search) ||
+                    str_contains($route['name'] ?? '', $search) ||
+                    str_contains($route['controller']['class'] ?? '', $search) ||
+                    str_contains($route['namespace'] ?? '', $search);
+            });
+        }
+
+        if ($request->has('method')) {
+            $method = strtoupper($request->get('method'));
+            $routes = $routes->filter(function ($route) use ($method) {
+                return in_array($method, $route['methods']);
+            });
+        }
+
+        if ($request->has('middleware')) {
+            $middleware = $request->get('middleware');
+            $routes = $routes->filter(function ($route) use ($middleware) {
+                return in_array($middleware, $route['middleware']);
+            });
+        }
+
+        if ($request->has('middleware_group')) {
+            $middlewareGroup = $request->get('middleware_group');
+            $routes = $routes->filter(function ($route) use ($middlewareGroup) {
+                return in_array($middlewareGroup, $route['middleware_groups']);
+            });
+        }
+
+        if ($request->has('domain')) {
+            $domain = $request->get('domain');
+            $routes = $routes->filter(function ($route) use ($domain) {
+                return $route['domain'] === $domain;
+            });
+        }
+
+        if ($request->has('namespace')) {
+            $namespace = $request->get('namespace');
+            $routes = $routes->filter(function ($route) use ($namespace) {
+                return $route['namespace'] === $namespace;
+            });
+        }
+
+        return $routes;
+    }
+
+    protected function getTreeDataFromRoutes(Collection $routes): array
+    {
+        $tree = [];
+
+        foreach ($routes as $route) {
+            $parts = explode('/', trim($route['uri'], '/'));
+            $current = &$tree;
+
+            foreach ($parts as $part) {
+                if (!isset($current[$part])) {
+                    $current[$part] = [
+                        'name' => $part,
+                        'routes' => [],
+                        'children' => [],
+                    ];
+                }
+                $current = &$current[$part]['children'];
+            }
+
+            // Add the route to the final segment
+            $finalPart = end($parts) ?: '/';
+            if (!isset($tree[$finalPart])) {
+                $tree[$finalPart] = [
+                    'name' => $finalPart,
+                    'routes' => [],
+                    'children' => [],
+                ];
+            }
+            $tree[$finalPart]['routes'][] = $route;
+        }
+
+        return $tree;
     }
 }
