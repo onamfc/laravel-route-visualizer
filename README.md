@@ -7,13 +7,12 @@ A comprehensive route visualization package for Laravel applications that provid
 -  **Interactive Route Explorer**: Web-based dashboard with advanced search and filtering
 -  **Network Graph Visualization**: Interactive network graphs using Vis.js for route relationships
 -  **Tree View**: Hierarchical visualization of route structure organized by prefixes
--  **Responsive Design**: Works perfectly on desktop and mobile devices with dark/light themes
 -  **Advanced Filtering**: Filter by HTTP methods, middleware, middleware groups, controllers, domains, namespaces, and more
 -  **Route Validation**: Automatic detection of duplicate routes, missing controllers, and missing methods
 -  **Export Capabilities**: Export filtered route data to HTML, JSON, or SVG formats
 -  **Performance Optimized**: Built-in caching, pagination, and lazy loading for large route sets
 -  **Security Aware**: Hide sensitive routes in production environments
--  **Customizable**: Dark/light themes, configurable visualization options, and multiple templates
+-  **Customizable**: Configurable visualization options, and multiple templates
 -  **Copy to Clipboard**: One-click copying of route URIs and controller actions
 -  **Laravel Telescope Integration**: Direct links to route performance data when Telescope is installed
 
@@ -92,7 +91,6 @@ return [
     
     // Visualization library and options
     'visualization' => [
-        'theme' => 'light', // light, dark
         'layout' => 'hierarchical', // hierarchical, network
         'pagination' => [
             'enabled' => true,
@@ -149,13 +147,17 @@ http://your-app.com/route-visualizer
 The dashboard provides:
 
 - **Overview Statistics**: Total routes, controllers, middleware, domains, namespaces, and validation issues
+    ![Overview Stats](./docs/assets/route-visualizor--overview.jpg)
 - **Advanced Search & Filtering**: Real-time search with filters for methods, middleware, domains, namespaces, and more
+    ![Advanced Filtering](./docs/assets/route-visualizor--filter.jpg)
 - **Multiple View Modes**: 
   - **List View**: Detailed tabular view with pagination and copy-to-clipboard functionality
+    ![List View](./docs/assets/route-visualizor--list-view.jpg)
   - **Graph View**: Interactive network visualization using Vis.js
+    ![Graph View](./docs/assets/route-visualizor--graph-view.jpg)
   - **Tree View**: Hierarchical visualization organized by route structure
+    ![Tree View](./docs/assets/route-visualizor--tree-view.jpg)
 - **Route Validation**: Visual indicators for duplicate routes, missing controllers, and missing methods
-- **Dark/Light Theme**: Toggle between themes with persistent preference
 - **Export Options**: Download filtered route data in various formats
 - **Telescope Integration**: Direct links to route performance data (when available)
 
@@ -276,7 +278,7 @@ Edit the views in `resources/views/vendor/route-visualizer/`.
 
 ### Custom Styling
 
-The dashboard includes comprehensive dark/light theme support. You can customize colors and styling by:
+You can customize colors and styling by:
 
 1. Publishing the views and modifying the CSS
 2. Overriding the Tailwind classes in your custom views
@@ -301,6 +303,20 @@ The package uses Vis.js for interactive network graphs that show relationships b
 - Color-coded nodes for different types (controllers vs routes)
 - Validation status indicators (errors in red, warnings in yellow)
 - Hover tooltips with detailed information
+
+## Screenshots
+
+### Advanced Filtering
+![Advanced Filtering](./docs/assets/route-visualizor--filter.jpg)
+
+### List View
+![List View](./docs/assets/route-visualizor--list-view.jpg)
+
+### Tree View
+![Tree View](./docs/assets/route-visualizor--tree-view.jpg)
+
+### Graph View
+![Graph View](./docs/assets/route-visualizor--graph-view.jpg)
 
 ## Security Considerations
 
@@ -434,9 +450,8 @@ This package is open-sourced software licensed under the [MIT license](LICENSE.m
 
 ## Changelog
 
-### v1.1.0
+### v1.0.0
 - **NEW**: Interactive network visualization using Vis.js
-- **NEW**: Dark/light theme support with persistent preferences
 - **NEW**: Tree view for hierarchical route visualization
 - **NEW**: Advanced filtering by domain, namespace, and middleware groups
 - **NEW**: Route validation with duplicate detection and missing controller/method checks
@@ -448,9 +463,6 @@ This package is open-sourced software licensed under the [MIT license](LICENSE.m
 - **IMPROVED**: Enhanced UI with better responsive design
 - **IMPROVED**: More comprehensive statistics and analytics
 - **IMPROVED**: Better error handling and user feedback
-
-### v1.0.0
-- Initial release
 - Web dashboard with interactive visualization
 - Export functionality
 - Caching support
