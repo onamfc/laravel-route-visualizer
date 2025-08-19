@@ -462,6 +462,14 @@
                 });
 
                 await this.loadRoutes(true);
+                
+                // Update current view if it's graph or tree
+                const currentView = document.getElementById('view-mode').value;
+                if (currentView === 'graph') {
+                    await this.renderGraph();
+                } else if (currentView === 'tree') {
+                    await this.renderTree();
+                }
             }
 
             resetFilters() {
@@ -471,7 +479,15 @@
                 document.getElementById('domain-filter').value = '';
                 document.getElementById('namespace-filter').value = '';
                 this.filters = {};
-                this.loadRoutes(true);
+                this.loadRoutes(true).then(() => {
+                    // Update current view if it's graph or tree
+                    const currentView = document.getElementById('view-mode').value;
+                    if (currentView === 'graph') {
+                        this.renderGraph();
+                    } else if (currentView === 'tree') {
+                        this.renderTree();
+                    }
+                });
             }
 
             async clearCache() {
@@ -716,7 +732,8 @@
 
             async renderTree() {
                 try {
-                    const response = await fetch(`/{{ config("route-visualizer.route_prefix") }}/tree-data`);
+                    const params = new URLSearchParams(this.filters);
+                    const response = await fetch(`/{{ config("route-visualizer.route_prefix") }}/tree-data?${params}`);
                     const data = await response.json();
                     
                     const container = document.getElementById('tree-view');
