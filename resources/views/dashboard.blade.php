@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Laravel Route Visualizer</title>
+    <title>Route Visualizer</title>
     <meta name="csrf-token" content="{{ csrf_token() }}">
     
     <!-- Vis.js for network visualization -->
@@ -114,8 +114,7 @@
             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div class="flex justify-between items-center py-4">
                     <div class="flex items-center">
-                        <i class="fas fa-route text-blue-600 dark:text-blue-400 text-2xl mr-3"></i>
-                        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Laravel Route Visualizer</h1>
+                        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Route Visualizer</h1>
                     </div>
                     <div class="flex items-center space-x-4">
                         <button id="refresh-btn" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
