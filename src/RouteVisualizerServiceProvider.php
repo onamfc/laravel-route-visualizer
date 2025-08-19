@@ -3,53 +3,44 @@
 namespace onamfc\LaravelRouteVisualizer;
 
 use Illuminate\Support\ServiceProvider;
-use Illuminate\Support\Facades\Route;
 use onamfc\LaravelRouteVisualizer\Services\RouteScanner;
-use onamfc\LaravelRouteVisualizer\Console\Commands\InstallCommand;
 use onamfc\LaravelRouteVisualizer\Console\Commands\ExportRoutesCommand;
+use onamfc\LaravelRouteVisualizer\Console\Commands\InstallCommand;
 
 class RouteVisualizerServiceProvider extends ServiceProvider
 {
-    /**
-     * Register services.
-     */
     public function register(): void
     {
-        $this->mergeConfigFrom(
-            __DIR__.'/../config/route-visualizer.php',
-            'route-visualizer'
-        );
+        $this->mergeConfigFrom(__DIR__ . '/../config/route-visualizer.php', 'route-visualizer');
 
-        $this->app->singleton(RouteScanner::class, function ($app) {
-            return new RouteScanner();
-        });
+        $this->app->singleton(RouteScanner::class);
+
+        $this->commands([
+            ExportRoutesCommand::class,
+            InstallCommand::class,
+        ]);
     }
 
-    /**
-     * Bootstrap services.
-     */
     public function boot(): void
     {
-        if (!config('route-visualizer.enabled', false)) {
-            return;
-        }
-
-        $this->loadViewsFrom(__DIR__.'/../resources/views', 'route-visualizer');
-        $this->loadRoutesFrom(__DIR__.'/../routes/web.php');
-
         if ($this->app->runningInConsole()) {
             $this->publishes([
-                __DIR__.'/../config/route-visualizer.php' => config_path('route-visualizer.php'),
+                __DIR__ . '/../config/route-visualizer.php' => config_path('route-visualizer.php'),
             ], 'route-visualizer-config');
 
             $this->publishes([
-                __DIR__.'/../resources/views' => resource_path('views/vendor/route-visualizer'),
+                __DIR__ . '/../resources/views' => resource_path('views/vendor/route-visualizer'),
             ], 'route-visualizer-views');
 
-            $this->commands([
-                InstallCommand::class,
-                ExportRoutesCommand::class,
-            ]);
+            $this->publishes([
+                __DIR__ . '/../resources/assets' => public_path('vendor/route-visualizer'),
+            ], 'route-visualizer-assets');
+        }
+
+        $this->loadViewsFrom(__DIR__ . '/../resources/views', 'route-visualizer');
+
+        if (config('route-visualizer.enabled', true)) {
+            $this->loadRoutesFrom(__DIR__ . '/../routes/web.php');
         }
     }
 }

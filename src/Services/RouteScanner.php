@@ -3,144 +3,78 @@
 namespace onamfc\LaravelRouteVisualizer\Services;
 
 use Illuminate\Routing\Route;
+use Illuminate\Routing\Router;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Route as RouteFacade;
-use Illuminate\Support\Str;
 use ReflectionClass;
 use ReflectionException;
 
 class RouteScanner
 {
-    protected Collection $routes;
-    protected array $duplicates = [];
-    protected array $validationIssues = [];
+    protected Router $router;
 
-    public function __construct()
+    public function __construct(Router $router)
     {
-        $this->routes = collect();
+        $this->router = $router;
     }
 
-    /**
-     * Scan all routes and return formatted data
-     */
     public function scanRoutes(): Collection
     {
-        $cacheKey = config('route-visualizer.cache.key', 'route_visualizer_data');
-        $cacheTtl = config('route-visualizer.cache.ttl', 3600);
-
-        if (config('route-visualizer.cache.enabled', true)) {
-            return Cache::remember($cacheKey, $cacheTtl, function () {
-                return $this->scanRoutesCollection();
-            });
+        if (config('route-visualizer.cache.enabled')) {
+            return Cache::remember(
+                config('route-visualizer.cache.key'),
+                config('route-visualizer.cache.ttl'),
+                fn() => $this->extractRouteData()
+            );
         }
 
-        return $this->scanRoutesCollection();
+        return $this->extractRouteData();
     }
 
-    /**
-     * Scan routes collection without caching
-     */
-    public function scanRoutesCollection(): Collection
+    protected function extractRouteData(): Collection
     {
-        $routes = collect();
-        $routeCollection = RouteFacade::getRoutes();
+        $routes = collect($this->router->getRoutes()->getRoutes());
 
-        foreach ($routeCollection as $route) {
-            if ($this->shouldSkipRoute($route)) {
-                continue;
-            }
-
-            $routeData = $this->extractRouteData($route);
-            $routeData['validation'] = $this->validateRoute($route, $routeData);
-            
-            $routes->push($routeData);
-        }
-
-        $this->routes = $routes;
-        $this->findDuplicateRoutes();
-
-        return $routes;
+        return $routes->map(function (Route $route) {
+            return $this->formatRoute($route);
+        })->filter(function ($route) {
+            return $this->shouldIncludeRoute($route);
+        });
     }
 
-    /**
-     * Extract data from a single route
-     */
-    protected function extractRouteData(Route $route): array
+    protected function formatRoute(Route $route): array
     {
         $action = $route->getAction();
-        $controller = $this->parseControllerAction($action);
+        $controller = $action['controller'] ?? null;
+        $controllerInfo = $this->parseControllerAction($controller);
 
-        return [
+        $routeData = [
+            'id' => md5($route->uri() . implode('|', $route->methods())),
             'uri' => $route->uri(),
             'name' => $route->getName(),
             'methods' => $route->methods(),
+            'controller' => $controllerInfo,
             'middleware' => $this->getRouteMiddleware($route),
-            'controller' => $controller,
+            'middleware_groups' => $this->getMiddlewareGroups($route),
             'parameters' => $route->parameterNames(),
-            'domain' => $route->getDomain(),
-            'namespace' => $action['namespace'] ?? null,
-            'prefix' => $action['prefix'] ?? null,
             'where' => $route->wheres,
-            'compiled' => $route->getCompiled()?->getPattern(),
+            'domain' => $route->domain(),
+            'subdomain' => $this->getSubdomain($route),
+            'prefix' => $this->getRoutePrefix($route),
+            'namespace' => $action['namespace'] ?? null,
+            'as' => $action['as'] ?? null,
+            'uses' => $action['uses'] ?? null,
         ];
+
+        // Add validation flags
+        if (config('route-visualizer.validation.check_duplicates')) {
+            $routeData['validation'] = $this->validateRoute($routeData);
+        }
+
+        return $routeData;
     }
 
-    /**
-     * Parse controller action from route action
-     */
-    protected function parseControllerAction(array $action): ?array
-    {
-        if (!isset($action['controller'])) {
-            return null;
-        }
-
-        $controller = $action['controller'];
-
-        if (is_string($controller)) {
-            if (Str::contains($controller, '@')) {
-                [$class, $method] = explode('@', $controller, 2);
-                return [
-                    'class' => $class,
-                    'method' => $method,
-                    'full' => $controller,
-                ];
-            }
-        }
-
-        if (is_array($controller) && count($controller) === 2) {
-            return [
-                'class' => is_object($controller[0]) ? get_class($controller[0]) : $controller[0],
-                'method' => $controller[1],
-                'full' => (is_object($controller[0]) ? get_class($controller[0]) : $controller[0]) . '@' . $controller[1],
-            ];
-        }
-
-        return null;
-    }
-
-    /**
-     * Get middleware for a route
-     */
-    protected function getRouteMiddleware(Route $route): array
-    {
-        $middleware = [];
-        
-        foreach ($route->gatherMiddleware() as $middlewareItem) {
-            if (is_string($middlewareItem)) {
-                $middleware[] = $middlewareItem;
-            } elseif (is_object($middlewareItem)) {
-                $middleware[] = get_class($middlewareItem);
-            }
-        }
-
-        return array_unique($middleware);
-    }
-
-    /**
-     * Validate a route for common issues
-     */
-    protected function validateRoute(Route $route, array $routeData): array
+    protected function validateRoute(array $route): array
     {
         $validation = [
             'is_duplicate' => false,
@@ -149,205 +83,240 @@ class RouteScanner
             'warnings' => [],
         ];
 
-        if (!config('route-visualizer.validation.check_missing_controllers', true)) {
-            return $validation;
-        }
+        // Check for missing controller/method
+        if ($route['controller'] && config('route-visualizer.validation.check_missing_controllers')) {
+            $controllerClass = $route['controller']['class'];
+            $method = $route['controller']['method'];
 
-        $controller = $routeData['controller'];
-        if ($controller) {
-            // Check if controller class exists
-            if (!class_exists($controller['class'])) {
-                $validation['missing_controller'] = true;
-                $validation['warnings'][] = "Controller class '{$controller['class']}' not found";
-            } else {
-                // Check if method exists
-                try {
-                    $reflection = new ReflectionClass($controller['class']);
-                    if (!$reflection->hasMethod($controller['method'])) {
+            try {
+                if (!class_exists($controllerClass)) {
+                    $validation['missing_controller'] = true;
+                    $validation['warnings'][] = "Controller class '{$controllerClass}' not found";
+                } else {
+                    $reflection = new ReflectionClass($controllerClass);
+                    if (!$reflection->hasMethod($method)) {
                         $validation['missing_method'] = true;
-                        $validation['warnings'][] = "Method '{$controller['method']}' not found in controller '{$controller['class']}'";
+                        $validation['warnings'][] = "Method '{$method}' not found in controller";
                     }
-                } catch (ReflectionException $e) {
-                    $validation['warnings'][] = "Could not reflect controller class: " . $e->getMessage();
                 }
+            } catch (ReflectionException $e) {
+                $validation['missing_controller'] = true;
+                $validation['warnings'][] = "Error checking controller: " . $e->getMessage();
             }
         }
 
         return $validation;
     }
 
-    /**
-     * Check if route should be skipped based on security settings
-     */
-    protected function shouldSkipRoute(Route $route): bool
+    protected function getMiddlewareGroups(Route $route): array
     {
-        if (!config('route-visualizer.security.hide_sensitive_routes', true)) {
-            return false;
-        }
+        $middleware = $this->getRouteMiddleware($route);
+        $groups = [];
 
-        $sensitivePatterns = config('route-visualizer.security.sensitive_patterns', []);
-        $uri = $route->uri();
-
-        foreach ($sensitivePatterns as $pattern) {
-            if (Str::is($pattern, $uri)) {
-                return true;
+        foreach ($middleware as $middlewareName) {
+            // Check if this middleware is actually a group
+            $middlewareGroups = app('router')->getMiddlewareGroups();
+            if (array_key_exists($middlewareName, $middlewareGroups)) {
+                $groups[] = $middlewareName;
             }
         }
 
-        return false;
+        return $groups;
     }
 
-    /**
-     * Find duplicate routes
-     */
-    public function findDuplicateRoutes(): Collection
+    protected function getSubdomain(Route $route): ?string
     {
-        if (!config('route-visualizer.validation.check_duplicates', true)) {
-            return collect();
+        $domain = $route->domain();
+        if (!$domain) {
+            return null;
         }
 
-        $duplicates = collect();
-        $routeSignatures = [];
+        // Extract subdomain from domain pattern
+        if (str_contains($domain, '{')) {
+            // Dynamic subdomain like {subdomain}.example.com
+            return $domain;
+        }
 
-        foreach ($this->routes as $index => $route) {
-            $signature = implode('|', $route['methods']) . ':' . $route['uri'];
-            
-            if (isset($routeSignatures[$signature])) {
-                $duplicates->push([
-                    'signature' => $signature,
-                    'routes' => [$routeSignatures[$signature], $index],
-                ]);
-                
-                // Mark both routes as duplicates
-                $this->routes[$routeSignatures[$signature]]['validation']['is_duplicate'] = true;
-                $this->routes[$index]['validation']['is_duplicate'] = true;
-            } else {
-                $routeSignatures[$signature] = $index;
+        // Static subdomain
+        $parts = explode('.', $domain);
+        if (count($parts) > 2) {
+            return $parts[0];
+        }
+
+        return null;
+    }
+
+    protected function parseControllerAction(?string $controller): ?array
+    {
+        if (!$controller) {
+            return null;
+        }
+
+        if (str_contains($controller, '@')) {
+            [$class, $method] = explode('@', $controller);
+            return [
+                'class' => $class,
+                'method' => $method,
+                'full' => $controller,
+            ];
+        }
+
+        return [
+            'class' => $controller,
+            'method' => '__invoke',
+            'full' => $controller,
+        ];
+    }
+
+    protected function getRouteMiddleware(Route $route): array
+    {
+        $middleware = [];
+
+        // Get middleware from route action
+        $actionMiddleware = $route->getAction('middleware') ?? [];
+        if (is_string($actionMiddleware)) {
+            $actionMiddleware = [$actionMiddleware];
+        }
+
+        // Get middleware from route directly
+        $routeMiddleware = $route->middleware();
+
+        return array_unique(array_merge($actionMiddleware, $routeMiddleware));
+    }
+
+    protected function getRoutePrefix(Route $route): ?string
+    {
+        $action = $route->getAction();
+        return $action['prefix'] ?? null;
+    }
+
+    protected function shouldIncludeRoute(array $route): bool
+    {
+        if (!config('route-visualizer.security.hide_sensitive_routes')) {
+            return true;
+        }
+
+        $patterns = config('route-visualizer.security.sensitive_patterns', []);
+
+        foreach ($patterns as $pattern) {
+            if (fnmatch($pattern, $route['uri'])) {
+                return false;
             }
         }
 
-        return $duplicates;
+        return true;
     }
 
-    /**
-     * Group routes by controller
-     */
+    public function clearCache(): void
+    {
+        Cache::forget(config('route-visualizer.cache.key'));
+    }
+
     public function getRoutesGroupedByController(): Collection
     {
-        return $this->routes->groupBy(function ($route) {
-            return $route['controller']['class'] ?? 'Closure';
-        });
+        return $this->scanRoutes()->groupBy('controller.class');
     }
 
-    /**
-     * Group routes by middleware
-     */
+    public function getRoutesGroupedByPrefix(): Collection
+    {
+        return $this->scanRoutes()->groupBy('prefix');
+    }
+
     public function getRoutesGroupedByMiddleware(): Collection
     {
+        $routes = $this->scanRoutes();
         $grouped = collect();
 
-        foreach ($this->routes as $route) {
+        $routes->each(function ($route) use ($grouped) {
             foreach ($route['middleware'] as $middleware) {
                 if (!$grouped->has($middleware)) {
                     $grouped->put($middleware, collect());
                 }
                 $grouped->get($middleware)->push($route);
             }
-        }
+        });
 
         return $grouped;
     }
 
-    /**
-     * Group routes by domain
-     */
     public function getRoutesGroupedByDomain(): Collection
     {
-        return $this->routes->groupBy('domain');
+        return $this->scanRoutes()->groupBy('domain');
     }
 
-    /**
-     * Group routes by namespace
-     */
     public function getRoutesGroupedByNamespace(): Collection
     {
-        return $this->routes->groupBy('namespace');
+        return $this->scanRoutes()->groupBy('namespace');
     }
 
-    /**
-     * Group routes by prefix
-     */
-    public function getRoutesGroupedByPrefix(): Collection
+    public function getRoutesGroupedByMiddlewareGroup(): Collection
     {
-        return $this->routes->groupBy('prefix');
+        $routes = $this->scanRoutes();
+        $grouped = collect();
+
+        $routes->each(function ($route) use ($grouped) {
+            foreach ($route['middleware_groups'] as $group) {
+                if (!$grouped->has($group)) {
+                    $grouped->put($group, collect());
+                }
+                $grouped->get($group)->push($route);
+            }
+        });
+
+        return $grouped;
     }
 
-    /**
-     * Get tree data for hierarchical visualization
-     */
+    public function findDuplicateRoutes(): Collection
+    {
+        $routes = $this->scanRoutes();
+        $duplicates = collect();
+
+        // Group by URI and methods combination
+        $grouped = $routes->groupBy(function ($route) {
+            return $route['uri'] . '|' . implode(',', $route['methods']);
+        });
+
+        $grouped->each(function ($routeGroup, $key) use ($duplicates) {
+            if ($routeGroup->count() > 1) {
+                $duplicates->put($key, $routeGroup);
+            }
+        });
+
+        return $duplicates;
+    }
+
     public function getTreeData(): array
     {
+        $routes = $this->scanRoutes();
         $tree = [];
 
-        foreach ($this->routes as $route) {
-            $segments = explode('/', trim($route['uri'], '/'));
-            $currentLevel = &$tree;
+        foreach ($routes as $route) {
+            $parts = explode('/', trim($route['uri'], '/'));
+            $current = &$tree;
 
-            foreach ($segments as $segment) {
-                if (!isset($currentLevel[$segment])) {
-                    $currentLevel[$segment] = [
-                        'name' => $segment,
+            foreach ($parts as $part) {
+                if (!isset($current[$part])) {
+                    $current[$part] = [
+                        'name' => $part,
                         'routes' => [],
                         'children' => [],
                     ];
                 }
-                $currentLevel = &$currentLevel[$segment]['children'];
+                $current = &$current[$part]['children'];
             }
 
-            // Add route to the final segment
-            $finalSegment = end($segments) ?: 'root';
-            if (!isset($tree[$finalSegment])) {
-                $tree[$finalSegment] = [
-                    'name' => $finalSegment,
+            // Add the route to the final segment
+            $finalPart = end($parts) ?: '/';
+            if (!isset($tree[$finalPart])) {
+                $tree[$finalPart] = [
+                    'name' => $finalPart,
                     'routes' => [],
                     'children' => [],
                 ];
             }
-            $tree[$finalSegment]['routes'][] = $route;
+            $tree[$finalPart]['routes'][] = $route;
         }
 
-        return ['tree' => $tree];
-    }
-
-    /**
-     * Clear route cache
-     */
-    public function clearCache(): void
-    {
-        $cacheKey = config('route-visualizer.cache.key', 'route_visualizer_data');
-        Cache::forget($cacheKey);
-    }
-
-    /**
-     * Get statistics about routes
-     */
-    public function getStatistics(): array
-    {
-        $routes = $this->routes;
-
-        return [
-            'total_routes' => $routes->count(),
-            'total_controllers' => $routes->pluck('controller.class')->filter()->unique()->count(),
-            'total_middleware' => $routes->pluck('middleware')->flatten()->unique()->count(),
-            'total_methods' => $routes->pluck('methods')->flatten()->unique()->count(),
-            'total_domains' => $routes->pluck('domain')->filter()->unique()->count(),
-            'total_namespaces' => $routes->pluck('namespace')->filter()->unique()->count(),
-            'total_prefixes' => $routes->pluck('prefix')->filter()->unique()->count(),
-            'validation_issues' => $routes->filter(function ($route) {
-                return $route['validation']['missing_controller'] || 
-                       $route['validation']['missing_method'] || 
-                       $route['validation']['is_duplicate'];
-            })->count(),
-        ];
+        return $tree;
     }
 }

@@ -6,19 +6,11 @@ use Illuminate\Console\Command;
 
 class InstallCommand extends Command
 {
-    /**
-     * The name and signature of the console command.
-     */
-    protected $signature = 'route-visualizer:install';
+    protected $signature = 'route-visualizer:install 
+                           {--force : Overwrite existing files}';
 
-    /**
-     * The console command description.
-     */
     protected $description = 'Install the Laravel Route Visualizer package';
 
-    /**
-     * Execute the console command.
-     */
     public function handle(): int
     {
         $this->info('Installing Laravel Route Visualizer...');
@@ -26,33 +18,28 @@ class InstallCommand extends Command
         // Publish configuration
         $this->call('vendor:publish', [
             '--tag' => 'route-visualizer-config',
-            '--force' => true,
+            '--force' => $this->option('force'),
         ]);
 
-        $this->info('✓ Configuration file published');
+        // Publish views
+        $this->call('vendor:publish', [
+            '--tag' => 'route-visualizer-views',
+            '--force' => $this->option('force'),
+        ]);
 
-        // Ask if user wants to publish views
-        if ($this->confirm('Do you want to publish the views for customization?', false)) {
-            $this->call('vendor:publish', [
-                '--tag' => 'route-visualizer-views',
-                '--force' => true,
-            ]);
-            $this->info('✓ Views published');
-        }
+        // Publish assets
+        $this->call('vendor:publish', [
+            '--tag' => 'route-visualizer-assets',
+            '--force' => $this->option('force'),
+        ]);
 
-        $this->newLine();
-        $this->info('🎉 Laravel Route Visualizer installed successfully!');
-        $this->newLine();
-        
-        $this->line('Next steps:');
-        $this->line('1. Visit <comment>/route-visualizer</comment> to access the dashboard');
-        $this->line('2. Configure settings in <comment>config/route-visualizer.php</comment>');
-        $this->line('3. Run <comment>php artisan route:export</comment> to export routes');
-        
-        $this->newLine();
-        $this->warn('Note: The visualizer is only enabled in local and testing environments by default.');
-        $this->line('Set <comment>ROUTE_VISUALIZER_ENABLED=true</comment> in your .env file to enable in other environments.');
+        $this->info('✅ Laravel Route Visualizer installed successfully!');
+        $this->info('');
+        $this->info('Next steps:');
+        $this->info('1. Visit /route-visualizer to access the dashboard');
+        $this->info('2. Customize config/route-visualizer.php as needed');
+        $this->info('3. Run php artisan route:export to generate static exports');
 
-        return self::SUCCESS;
+        return Command::SUCCESS;
     }
 }

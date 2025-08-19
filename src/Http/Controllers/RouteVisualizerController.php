@@ -4,136 +4,161 @@ namespace onamfc\LaravelRouteVisualizer\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Routing\Controller;
-use Illuminate\Support\Collection;
+use Illuminate\Contracts\View\View;
 use onamfc\LaravelRouteVisualizer\Services\RouteScanner;
 
-class RouteVisualizerController extends Controller
+class RouteVisualizerController
 {
-    protected RouteScanner $scanner;
+    protected RouteScanner $routeScanner;
 
-    public function __construct(RouteScanner $scanner)
+    public function __construct(RouteScanner $routeScanner)
     {
-        $this->scanner = $scanner;
+        $this->routeScanner = $routeScanner;
     }
 
-    /**
-     * Show the route visualizer dashboard
-     */
-    public function index()
+    public function index(): View
     {
-        return view('route-visualizer::dashboard');
-    }
-
-    /**
-     * Get routes data with filtering and pagination
-     */
-    public function routes(Request $request): JsonResponse
-    {
-        $routes = $this->scanner->scanRoutes();
-        
-        // Apply filters
-        $routes = $this->applyFilters($routes, $request);
-        
-        // Get statistics and groupings
-        $grouped = [
-            'controllers' => $this->scanner->getRoutesGroupedByController()->mapWithKeys(function ($routes, $controller) {
-                return [$controller => $routes->count()];
-            }),
-            'middleware' => $this->scanner->getRoutesGroupedByMiddleware()->mapWithKeys(function ($routes, $middleware) {
-                return [$middleware => $routes->count()];
-            }),
-            'domains' => $this->scanner->getRoutesGroupedByDomain()->mapWithKeys(function ($routes, $domain) {
-                return [$domain ?: 'default' => $routes->count()];
-            }),
-            'namespaces' => $this->scanner->getRoutesGroupedByNamespace()->mapWithKeys(function ($routes, $namespace) {
-                return [$namespace ?: 'default' => $routes->count()];
-            }),
-            'prefixes' => $this->scanner->getRoutesGroupedByPrefix()->mapWithKeys(function ($routes, $prefix) {
-                return [$prefix ?: 'root' => $routes->count()];
-            }),
-        ];
-
-        // Pagination
-        $page = (int) $request->get('page', 1);
-        $perPage = (int) $request->get('per_page', 50);
-        $total = $routes->count();
-        
-        $paginatedRoutes = $routes->forPage($page, $perPage)->values();
-        
-        return response()->json([
-            'routes' => $paginatedRoutes,
-            'total' => $total,
-            'current_page' => $page,
-            'per_page' => $perPage,
-            'has_more' => ($page * $perPage) < $total,
-            'grouped' => $grouped,
-            'duplicates' => $this->scanner->findDuplicateRoutes()->count(),
+        return view('route-visualizer::dashboard', [
+            'config' => config('route-visualizer'),
         ]);
     }
 
-    /**
-     * Get graph data for network visualization
-     */
-    public function graph(Request $request): JsonResponse
+    public function routes(Request $request): JsonResponse
     {
-        $routes = $this->scanner->scanRoutes();
-        $routes = $this->applyFilters($routes, $request);
+        $routes = $this->routeScanner->scanRoutes();
+        $page = (int) $request->get('page', 1);
+        $perPage = (int) $request->get('per_page', config('route-visualizer.visualization.pagination.per_page', 50));
 
-        $nodes = collect();
-        $edges = collect();
-        $nodeIds = [];
-
-        // Create controller nodes
-        $controllerGroups = $routes->groupBy('controller.class');
-        foreach ($controllerGroups as $controller => $controllerRoutes) {
-            if ($controller && $controller !== 'null') {
-                $nodeId = 'controller_' . md5($controller);
-                $nodeIds[$controller] = $nodeId;
-                
-                $hasIssues = $controllerRoutes->some(function ($route) {
-                    return $route['validation']['missing_controller'] || $route['validation']['missing_method'];
-                });
-                
-                $nodes->push([
-                    'id' => $nodeId,
-                    'label' => class_basename($controller),
-                    'title' => $controller . "\n" . $controllerRoutes->count() . ' routes',
-                    'group' => 'controller',
-                    'color' => $hasIssues ? '#ef4444' : '#3b82f6',
-                ]);
-            }
+        if ($request->has('search')) {
+            $search = $request->get('search');
+            $routes = $routes->filter(function ($route) use ($search) {
+                return str_contains($route['uri'], $search) ||
+                    str_contains($route['name'] ?? '', $search) ||
+                    str_contains($route['controller']['class'] ?? '', $search) ||
+                    str_contains($route['namespace'] ?? '', $search);
+            });
         }
 
-        // Create route nodes and edges
-        foreach ($routes as $index => $route) {
-            $routeId = 'route_' . $index;
-            
-            $color = '#10b981'; // Default green
-            if ($route['validation']['is_duplicate']) {
-                $color = '#f59e0b'; // Yellow for duplicates
-            } elseif ($route['validation']['missing_controller'] || $route['validation']['missing_method']) {
-                $color = '#ef4444'; // Red for errors
+        if ($request->has('method')) {
+            $method = strtoupper($request->get('method'));
+            $routes = $routes->filter(function ($route) use ($method) {
+                return in_array($method, $route['methods']);
+            });
+        }
+
+        if ($request->has('middleware')) {
+            $middleware = $request->get('middleware');
+            $routes = $routes->filter(function ($route) use ($middleware) {
+                return in_array($middleware, $route['middleware']);
+            });
+        }
+
+        if ($request->has('middleware_group')) {
+            $middlewareGroup = $request->get('middleware_group');
+            $routes = $routes->filter(function ($route) use ($middlewareGroup) {
+                return in_array($middlewareGroup, $route['middleware_groups']);
+            });
+        }
+
+        if ($request->has('domain')) {
+            $domain = $request->get('domain');
+            $routes = $routes->filter(function ($route) use ($domain) {
+                return $route['domain'] === $domain;
+            });
+        }
+
+        if ($request->has('namespace')) {
+            $namespace = $request->get('namespace');
+            $routes = $routes->filter(function ($route) use ($namespace) {
+                return $route['namespace'] === $namespace;
+            });
+        }
+
+        // Pagination
+        $total = $routes->count();
+        $paginatedRoutes = $routes->forPage($page, $perPage);
+        return response()->json([
+            'routes' => $paginatedRoutes->values(),
+            'total' => $total,
+            'page' => $page,
+            'per_page' => $perPage,
+            'has_more' => ($page * $perPage) < $total,
+            'grouped' => [
+                'controllers' => $this->routeScanner->getRoutesGroupedByController()->map->count(),
+                'prefixes' => $this->routeScanner->getRoutesGroupedByPrefix()->map->count(),
+                'middleware' => $this->routeScanner->getRoutesGroupedByMiddleware()->map->count(),
+                'middleware_groups' => $this->routeScanner->getRoutesGroupedByMiddlewareGroup()->map->count(),
+                'domains' => $this->routeScanner->getRoutesGroupedByDomain()->map->count(),
+                'namespaces' => $this->routeScanner->getRoutesGroupedByNamespace()->map->count(),
+            ],
+            'duplicates' => $this->routeScanner->findDuplicateRoutes()->count(),
+        ]);
+    }
+
+    public function graph(): JsonResponse
+    {
+        $type = request()->get('type', 'vis');
+        $routes = $this->routeScanner->scanRoutes();
+
+        return match ($type) {
+            'd3' => $this->getD3GraphData($routes),
+            'mermaid' => $this->getMermaidGraphData($routes),
+            default => $this->getVisGraphData($routes),
+        };
+    }
+
+    protected function getVisGraphData(Collection $routes): JsonResponse
+    {
+        $nodes = collect();
+        $edges = collect();
+
+        // Create controller nodes
+        $controllers = $routes->groupBy('controller.class')->keys();
+        $controllers->each(function ($controller, $index) use ($nodes) {
+            if ($controller) {
+                $nodes->push([
+                    'id' => "controller_{$index}",
+                    'label' => class_basename($controller),
+                    'group' => 'controller',
+                    'title' => $controller,
+                ]);
             }
-            
+        });
+
+        // Create route nodes and edges
+        $routes->each(function ($route, $index) use ($nodes, $edges, $controllers) {
+            $routeId = "route_{$index}";
+
+            $color = '#10B981'; // default green
+            if (isset($route['validation'])) {
+                if ($route['validation']['missing_controller'] || $route['validation']['missing_method']) {
+                    $color = '#EF4444'; // red for errors
+                } elseif ($route['validation']['is_duplicate']) {
+                    $color = '#F59E0B'; // yellow for warnings
+                }
+            }
+
             $nodes->push([
                 'id' => $routeId,
                 'label' => $route['uri'],
-                'title' => implode('|', $route['methods']) . ' ' . $route['uri'] . 
-                          ($route['name'] ? "\nName: " . $route['name'] : ''),
                 'group' => 'route',
+                'title' => implode('|', $route['methods']) . ' ' . $route['uri'],
+                'methods' => $route['methods'],
                 'color' => $color,
             ]);
 
-            // Create edge to controller if exists
-            if ($route['controller'] && isset($nodeIds[$route['controller']['class']])) {
-                $edges->push([
-                    'from' => $nodeIds[$route['controller']['class']],
-                    'to' => $routeId,
-                    'arrows' => 'to',
-                ]);
+            // Connect to controller
+            if ($route['controller']['class'] ?? null) {
+                $controllerIndex = $controllers->search($route['controller']['class']);
+                if ($controllerIndex !== false) {
+                    $edges->push([
+                        'from' => "controller_{$controllerIndex}",
+                        'to' => $routeId,
+                        'label' => $route['controller']['method'] ?? '',
+                    ]);
+                }
             }
-        }
+        });
 
         return response()->json([
             'nodes' => $nodes->values(),
@@ -141,81 +166,100 @@ class RouteVisualizerController extends Controller
         ]);
     }
 
-    /**
-     * Get tree data for hierarchical visualization
-     */
-    public function treeData(Request $request): JsonResponse
+    protected function getD3GraphData(Collection $routes): JsonResponse
     {
-        $routes = $this->scanner->scanRoutes();
-        $routes = $this->applyFilters($routes, $request);
-        
-        // Update scanner routes for tree generation
-        $this->scanner->routes = $routes;
-        
-        return response()->json($this->scanner->getTreeData());
-    }
+        $nodes = [];
+        $links = [];
+        $nodeIndex = 0;
+        $nodeMap = [];
 
-    /**
-     * Clear route cache
-     */
-    public function clearCache(): JsonResponse
-    {
-        $this->scanner->clearCache();
-        
+        // Create controller nodes
+        $controllers = $routes->groupBy('controller.class')->keys()->filter();
+        foreach ($controllers as $controller) {
+            $nodeMap[$controller] = $nodeIndex;
+            $nodes[] = [
+                'id' => $nodeIndex++,
+                'name' => class_basename($controller),
+                'group' => 'controller',
+                'fullName' => $controller,
+            ];
+        }
+
+        // Create route nodes and links
+        foreach ($routes as $route) {
+            $routeNodeId = $nodeIndex++;
+            $nodes[] = [
+                'id' => $routeNodeId,
+                'name' => $route['uri'],
+                'group' => 'route',
+                'methods' => $route['methods'],
+            ];
+
+            // Link to controller
+            if (isset($route['controller']['class']) && isset($nodeMap[$route['controller']['class']])) {
+                $links[] = [
+                    'source' => $nodeMap[$route['controller']['class']],
+                    'target' => $routeNodeId,
+                    'value' => 1,
+                ];
+            }
+        }
+
         return response()->json([
-            'message' => 'Route cache cleared successfully'
+            'nodes' => $nodes,
+            'links' => $links,
         ]);
     }
 
-    /**
-     * Apply filters to routes collection
-     */
-    protected function applyFilters(Collection $routes, Request $request): Collection
+    protected function getMermaidGraphData(Collection $routes): JsonResponse
     {
-        // Search filter
-        if ($search = $request->get('search')) {
-            $routes = $routes->filter(function ($route) use ($search) {
-                return str_contains(strtolower($route['uri']), strtolower($search)) ||
-                       str_contains(strtolower($route['name'] ?? ''), strtolower($search)) ||
-                       str_contains(strtolower($route['controller']['class'] ?? ''), strtolower($search));
-            });
+        $mermaidCode = "graph TD\n";
+        $controllers = $routes->groupBy('controller.class')->keys()->filter();
+
+        // Add controller nodes
+        foreach ($controllers as $index => $controller) {
+            $controllerId = "C{$index}";
+            $controllerName = class_basename($controller);
+            $mermaidCode .= "    {$controllerId}[{$controllerName}]\n";
         }
 
-        // Method filter
-        if ($method = $request->get('method')) {
-            $routes = $routes->filter(function ($route) use ($method) {
-                return in_array($method, $route['methods']);
-            });
+        // Add route nodes and connections
+        foreach ($routes as $index => $route) {
+            $routeId = "R{$index}";
+            $routeLabel = implode('|', $route['methods']) . ' ' . $route['uri'];
+            $mermaidCode .= "    {$routeId}[\"{$routeLabel}\"]\n";
+
+            // Connect to controller
+            if (isset($route['controller']['class'])) {
+                $controllerIndex = $controllers->search($route['controller']['class']);
+                if ($controllerIndex !== false) {
+                    $controllerId = "C{$controllerIndex}";
+                    $method = $route['controller']['method'] ?? '';
+                    $mermaidCode .= "    {$controllerId} --> {$routeId}\n";
+                }
+            }
         }
 
-        // Middleware filter
-        if ($middleware = $request->get('middleware')) {
-            $routes = $routes->filter(function ($route) use ($middleware) {
-                return in_array($middleware, $route['middleware']);
-            });
-        }
+        return response()->json([
+            'mermaid' => $mermaidCode,
+        ]);
+    }
 
-        // Domain filter
-        if ($domain = $request->get('domain')) {
-            $routes = $routes->filter(function ($route) use ($domain) {
-                return $route['domain'] === $domain;
-            });
-        }
+    public function treeData(): JsonResponse
+    {
+        $treeData = $this->routeScanner->getTreeData();
 
-        // Namespace filter
-        if ($namespace = $request->get('namespace')) {
-            $routes = $routes->filter(function ($route) use ($namespace) {
-                return $route['namespace'] === $namespace;
-            });
-        }
+        return response()->json([
+            'tree' => $treeData,
+        ]);
+    }
 
-        // Middleware group filter
-        if ($middlewareGroup = $request->get('middleware_group')) {
-            $routes = $routes->filter(function ($route) use ($middlewareGroup) {
-                return in_array($middlewareGroup, $route['middleware']);
-            });
-        }
+    public function clearCache(): JsonResponse
+    {
+        $this->routeScanner->clearCache();
 
-        return $routes;
+        return response()->json([
+            'message' => 'Route cache cleared successfully',
+        ]);
     }
 }
