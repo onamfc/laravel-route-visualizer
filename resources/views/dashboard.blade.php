@@ -17,10 +17,11 @@
     
     <style>
         #route-network, #tree-view {
-            height: 600px;
+            height: 800px;
             border: 1px solid #e5e7eb;
             border-radius: 0.5rem;
             background: #f9fafb;
+            overflow-y: auto;
         }
         
         .dark #route-network, .dark #tree-view {
