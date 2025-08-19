@@ -5,6 +5,7 @@ namespace onamfc\LaravelRouteVisualizer\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Collection;
 use onamfc\LaravelRouteVisualizer\Services\RouteScanner;
 
 class RouteVisualizerController
