@@ -304,20 +304,6 @@ The package uses Vis.js for interactive network graphs that show relationships b
 - Validation status indicators (errors in red, warnings in yellow)
 - Hover tooltips with detailed information
 
-## Screenshots
-
-### Advanced Filtering
-![Advanced Filtering](./docs/assets/route-visualizor--filter.jpg)
-
-### List View
-![List View](./docs/assets/route-visualizor--list-view.jpg)
-
-### Tree View
-![Tree View](./docs/assets/route-visualizor--tree-view.jpg)
-
-### Graph View
-![Graph View](./docs/assets/route-visualizor--graph-view.jpg)
-
 ## Security Considerations
 
 ### Production Usage
