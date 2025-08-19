@@ -24,10 +24,18 @@ class RouteScanner
             return Cache::remember(
                 config('route-visualizer.cache.key'),
                 config('route-visualizer.cache.ttl'),
-                fn() => $this->extractRouteData()
+                function() {
+                    return $this->extractRouteData();
+                }
             );
         }
 
+        return $this->extractRouteData();
+    }
+
+    public function scanRoutesCollection(): Collection
+    {
+        // Always return fresh data without caching for internal use
         return $this->extractRouteData();
     }
 
@@ -35,17 +43,28 @@ class RouteScanner
     {
         $routes = collect($this->router->getRoutes()->getRoutes());
 
-        return $routes->map(function (Route $route) {
-            return $this->formatRoute($route);
-        })->filter(function ($route) {
-            return $this->shouldIncludeRoute($route);
-        });
+        return $routes
+            ->map(function (Route $route) {
+                return $this->formatRoute($route);
+            })
+            ->filter(function ($route) {
+                return $this->shouldIncludeRoute($route);
+            })
+            ->values(); // Reset array keys to ensure proper serialization
     }
 
     protected function formatRoute(Route $route): array
     {
         $action = $route->getAction();
-        $controller = $action['controller'] ?? null;
+        
+        // Handle closure routes safely
+        $controller = null;
+        if (isset($action['controller']) && is_string($action['controller'])) {
+            $controller = $action['controller'];
+        } elseif (isset($action['uses']) && is_string($action['uses'])) {
+            $controller = $action['uses'];
+        }
+        
         $controllerInfo = $this->parseControllerAction($controller);
 
         $routeData = [
@@ -57,13 +76,14 @@ class RouteScanner
             'middleware' => $this->getRouteMiddleware($route),
             'middleware_groups' => $this->getMiddlewareGroups($route),
             'parameters' => $route->parameterNames(),
-            'where' => $route->wheres,
+            'where' => $route->wheres ?: [],
             'domain' => $route->domain(),
             'subdomain' => $this->getSubdomain($route),
             'prefix' => $this->getRoutePrefix($route),
             'namespace' => $action['namespace'] ?? null,
             'as' => $action['as'] ?? null,
-            'uses' => $action['uses'] ?? null,
+            'uses' => is_string($action['uses'] ?? null) ? $action['uses'] : null,
+            'is_closure' => $this->isClosure($action),
         ];
 
         // Add validation flags
@@ -72,6 +92,11 @@ class RouteScanner
         }
 
         return $routeData;
+    }
+    
+    protected function isClosure(array $action): bool
+    {
+        return isset($action['uses']) && $action['uses'] instanceof \Closure;
     }
 
     protected function validateRoute(array $route): array
@@ -82,6 +107,11 @@ class RouteScanner
             'missing_method' => false,
             'warnings' => [],
         ];
+
+        // Skip validation for closure routes
+        if ($route['is_closure']) {
+            return $validation;
+        }
 
         // Check for missing controller/method
         if ($route['controller'] && config('route-visualizer.validation.check_missing_controllers')) {
@@ -177,9 +207,13 @@ class RouteScanner
         if (is_string($actionMiddleware)) {
             $actionMiddleware = [$actionMiddleware];
         }
+        
+        // Filter out any non-string middleware (like closures)
+        $actionMiddleware = array_filter($actionMiddleware, 'is_string');
 
         // Get middleware from route directly
         $routeMiddleware = $route->middleware();
+        $routeMiddleware = array_filter($routeMiddleware, 'is_string');
 
         return array_unique(array_merge($actionMiddleware, $routeMiddleware));
     }
@@ -214,17 +248,17 @@ class RouteScanner
 
     public function getRoutesGroupedByController(): Collection
     {
-        return $this->scanRoutes()->groupBy('controller.class');
+        return $this->scanRoutesCollection()->groupBy('controller.class');
     }
 
     public function getRoutesGroupedByPrefix(): Collection
     {
-        return $this->scanRoutes()->groupBy('prefix');
+        return $this->scanRoutesCollection()->groupBy('prefix');
     }
 
     public function getRoutesGroupedByMiddleware(): Collection
     {
-        $routes = $this->scanRoutes();
+        $routes = $this->scanRoutesCollection();
         $grouped = collect();
 
         $routes->each(function ($route) use ($grouped) {
@@ -241,17 +275,17 @@ class RouteScanner
 
     public function getRoutesGroupedByDomain(): Collection
     {
-        return $this->scanRoutes()->groupBy('domain');
+        return $this->scanRoutesCollection()->groupBy('domain');
     }
 
     public function getRoutesGroupedByNamespace(): Collection
     {
-        return $this->scanRoutes()->groupBy('namespace');
+        return $this->scanRoutesCollection()->groupBy('namespace');
     }
 
     public function getRoutesGroupedByMiddlewareGroup(): Collection
     {
-        $routes = $this->scanRoutes();
+        $routes = $this->scanRoutesCollection();
         $grouped = collect();
 
         $routes->each(function ($route) use ($grouped) {
@@ -268,7 +302,7 @@ class RouteScanner
 
     public function findDuplicateRoutes(): Collection
     {
-        $routes = $this->scanRoutes();
+        $routes = $this->scanRoutesCollection();
         $duplicates = collect();
 
         // Group by URI and methods combination
@@ -287,7 +321,7 @@ class RouteScanner
 
     public function getTreeData(): array
     {
-        $routes = $this->scanRoutes();
+        $routes = $this->scanRoutesCollection();
         $tree = [];
 
         foreach ($routes as $route) {

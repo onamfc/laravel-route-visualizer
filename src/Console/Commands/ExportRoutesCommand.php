@@ -3,6 +3,7 @@
 namespace onamfc\LaravelRouteVisualizer\Console\Commands;
 
 use Illuminate\Console\Command;
+use Illuminate\Support\Collection;
 use onamfc\LaravelRouteVisualizer\Services\RouteExporter;
 use onamfc\LaravelRouteVisualizer\Services\RouteScanner;
 
