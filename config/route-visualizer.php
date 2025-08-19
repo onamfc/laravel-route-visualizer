@@ -40,7 +40,7 @@ return [
     |--------------------------------------------------------------------------
     */
     'visualization' => [
-        'theme' => 'light', // light, dark
+        'theme' => 'dark', // light, dark
         'layout' => 'hierarchical', // hierarchical, network
         'pagination' => [
             'enabled' => true,
