@@ -238,10 +238,11 @@ class RouteVisualizerController
         $tree = [];
 
         foreach ($routes as $route) {
-            $parts = explode('/', trim($route['uri'], '/'));
+            $uri = trim($route['uri'], '/');
+            $parts = $uri === '' ? [''] : explode('/', $uri);
             $current = &$tree;
 
-            foreach ($parts as $part) {
+            foreach ($parts as $index => $part) {
                 if (!isset($current[$part])) {
                     $current[$part] = [
                         'name' => $part,
@@ -249,19 +250,15 @@ class RouteVisualizerController
                         'children' => [],
                     ];
                 }
-                $current = &$current[$part]['children'];
+                
+                // If this is the last part, add the route here
+                if ($index === count($parts) - 1) {
+                    $current[$part]['routes'][] = $route;
+                } else {
+                    // Move to children for next iteration
+                    $current = &$current[$part]['children'];
+                }
             }
-
-            // Add the route to the final segment
-            $finalPart = end($parts) ?: '/';
-            if (!isset($tree[$finalPart])) {
-                $tree[$finalPart] = [
-                    'name' => $finalPart,
-                    'routes' => [],
-                    'children' => [],
-                ];
-            }
-            $tree[$finalPart]['routes'][] = $route;
         }
 
         return $tree;

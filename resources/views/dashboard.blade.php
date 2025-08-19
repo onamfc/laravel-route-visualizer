@@ -755,44 +755,126 @@
                 const treeDiv = document.createElement('div');
                 treeDiv.className = 'p-4 space-y-4';
 
-                Object.values(treeData).forEach(node => {
-                    if (node.routes && node.routes.length > 0) {
-                        const nodeDiv = document.createElement('div');
-                        nodeDiv.className = 'border border-gray-200 dark:border-gray-600 rounded-lg p-4 bg-gray-50 dark:bg-gray-700';
+                this.renderTreeNode(treeData, treeDiv, 0);
+
+                container.appendChild(treeDiv);
+            }
+
+            renderTreeNode(nodeData, parentElement, depth) {
+                Object.entries(nodeData).forEach(([key, node]) => {
+                    const nodeDiv = document.createElement('div');
+                    nodeDiv.className = `ml-${depth * 4} mb-2`;
+                    
+                    // Create collapsible node header
+                    const nodeHeader = document.createElement('div');
+                    nodeHeader.className = 'flex items-center cursor-pointer p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors';
+                    
+                    // Expand/collapse icon
+                    const hasChildren = Object.keys(node.children || {}).length > 0;
+                    const hasRoutes = (node.routes || []).length > 0;
+                    
+                    if (hasChildren || hasRoutes) {
+                        const toggleIcon = document.createElement('i');
+                        toggleIcon.className = 'fas fa-chevron-right text-gray-400 mr-2 transition-transform';
+                        toggleIcon.style.fontSize = '12px';
+                        nodeHeader.appendChild(toggleIcon);
+                    } else {
+                        const spacer = document.createElement('span');
+                        spacer.className = 'w-4 mr-2';
+                        nodeHeader.appendChild(spacer);
+                    }
+                    
+                    // Folder/route icon
+                    const icon = document.createElement('i');
+                    if (hasChildren) {
+                        icon.className = 'fas fa-folder text-blue-500 mr-2';
+                    } else if (hasRoutes) {
+                        icon.className = 'fas fa-file text-green-500 mr-2';
+                    } else {
+                        icon.className = 'fas fa-circle text-gray-400 mr-2';
+                        icon.style.fontSize = '8px';
+                    }
+                    nodeHeader.appendChild(icon);
+                    
+                    // Node name
+                    const nodeName = document.createElement('span');
+                    nodeName.className = 'font-medium text-gray-900 dark:text-white';
+                    nodeName.textContent = key === '' ? '/' : key;
+                    nodeHeader.appendChild(nodeName);
+                    
+                    // Route count badge
+                    if (hasRoutes) {
+                        const badge = document.createElement('span');
+                        badge.className = 'ml-2 px-2 py-1 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 text-xs rounded-full';
+                        badge.textContent = `${node.routes.length} route${node.routes.length !== 1 ? 's' : ''}`;
+                        nodeHeader.appendChild(badge);
+                    }
+                    
+                    nodeDiv.appendChild(nodeHeader);
+                    
+                    // Create collapsible content
+                    const nodeContent = document.createElement('div');
+                    nodeContent.className = 'hidden ml-6 mt-2';
+                    
+                    // Add routes for this node
+                    if (hasRoutes) {
+                        const routesContainer = document.createElement('div');
+                        routesContainer.className = 'space-y-1 mb-3';
                         
-                        const nodeTitle = document.createElement('h3');
-                        nodeTitle.className = 'font-semibold text-lg text-gray-900 dark:text-white mb-3';
-                        nodeTitle.textContent = node.name || 'Root';
-                        nodeDiv.appendChild(nodeTitle);
-
-                        const routesList = document.createElement('div');
-                        routesList.className = 'space-y-2';
-
                         node.routes.forEach(route => {
                             const routeDiv = document.createElement('div');
-                            routeDiv.className = 'flex items-center space-x-2 text-sm';
+                            routeDiv.className = 'flex items-center space-x-2 text-sm p-2 bg-gray-50 dark:bg-gray-700 rounded border-l-2 border-green-400';
                             
                             const methodSpan = document.createElement('span');
                             methodSpan.className = `px-2 py-1 rounded text-xs font-semibold method-${route.methods[0].toLowerCase()}`;
                             methodSpan.textContent = route.methods.join('|');
                             
                             const uriSpan = document.createElement('span');
-                            uriSpan.className = 'font-mono text-gray-700 dark:text-gray-300';
+                            uriSpan.className = 'font-mono text-gray-700 dark:text-gray-300 flex-1';
                             uriSpan.textContent = route.uri;
+                            
+                            const nameSpan = document.createElement('span');
+                            nameSpan.className = 'text-xs text-gray-500 dark:text-gray-400';
+                            nameSpan.textContent = route.name || '';
                             
                             routeDiv.appendChild(methodSpan);
                             routeDiv.appendChild(uriSpan);
-                            routesList.appendChild(routeDiv);
+                            if (route.name) {
+                                routeDiv.appendChild(nameSpan);
+                            }
+                            
+                            routesContainer.appendChild(routeDiv);
                         });
-
-                        nodeDiv.appendChild(routesList);
-                        treeDiv.appendChild(nodeDiv);
+                        
+                        nodeContent.appendChild(routesContainer);
                     }
+                    
+                    // Recursively render children
+                    if (hasChildren) {
+                        this.renderTreeNode(node.children, nodeContent, depth + 1);
+                    }
+                    
+                    nodeDiv.appendChild(nodeContent);
+                    
+                    // Add click handler for expand/collapse
+                    if (hasChildren || hasRoutes) {
+                        nodeHeader.addEventListener('click', () => {
+                            const isExpanded = !nodeContent.classList.contains('hidden');
+                            const toggleIcon = nodeHeader.querySelector('i');
+                            
+                            if (isExpanded) {
+                                nodeContent.classList.add('hidden');
+                                toggleIcon.style.transform = 'rotate(0deg)';
+                            } else {
+                                nodeContent.classList.remove('hidden');
+                                toggleIcon.style.transform = 'rotate(90deg)';
+                            }
+                        });
+                    }
+                    
+                    parentElement.appendChild(nodeDiv);
                 });
-
-                container.appendChild(treeDiv);
             }
-
             showNotification(message, type = 'info') {
                 const notification = document.createElement('div');
                 notification.className = `fixed top-4 right-4 p-4 rounded-lg shadow-lg z-50 ${
