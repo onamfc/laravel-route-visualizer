@@ -33,7 +33,7 @@ class InstallCommand extends Command
             '--force' => $this->option('force'),
         ]);
 
-        $this->info('✅ Laravel Route Visualizer installed successfully!');
+        $this->info('Laravel Route Visualizer installed successfully!');
         $this->info('');
         $this->info('Next steps:');
         $this->info('1. Visit /route-visualizer to access the dashboard');
