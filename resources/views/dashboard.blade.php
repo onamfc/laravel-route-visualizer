@@ -118,10 +118,6 @@
                         <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Laravel Route Visualizer</h1>
                     </div>
                     <div class="flex items-center space-x-4">
-                        <button id="theme-toggle" class="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
-                            <i class="fas fa-sun dark:hidden"></i>
-                            <i class="fas fa-moon hidden dark:inline"></i>
-                        </button>
                         <button id="refresh-btn" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
                             <i class="fas fa-sync-alt mr-2"></i>Refresh
                         </button>
@@ -326,7 +322,6 @@
                 document.getElementById('apply-filters').addEventListener('click', () => this.applyFilters());
                 document.getElementById('reset-filters').addEventListener('click', () => this.resetFilters());
                 document.getElementById('view-mode').addEventListener('change', (e) => this.switchView(e.target.value));
-                document.getElementById('theme-toggle').addEventListener('click', () => this.toggleTheme());
                 document.getElementById('load-more-btn').addEventListener('click', () => this.loadMoreRoutes());
                 
                 // Real-time search
@@ -339,17 +334,6 @@
                 const savedTheme = localStorage.getItem('route-visualizer-theme') || 'light';
                 if (savedTheme === 'dark') {
                     document.documentElement.classList.add('dark');
-                }
-            }
-
-            toggleTheme() {
-                const isDark = document.documentElement.classList.toggle('dark');
-                localStorage.setItem('route-visualizer-theme', isDark ? 'dark' : 'light');
-
-                // Re-render current view if it's a graph
-                const currentView = document.getElementById('view-mode').value;
-                if (currentView === 'graph') {
-                    this.renderGraph();
                 }
             }
 
