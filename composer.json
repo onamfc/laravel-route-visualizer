@@ -1,6 +1,6 @@
 {
     "name": "onamfc/laravel-route-visualizer",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "description": "A comprehensive route visualization package for Laravel applications",
     "type": "library",
     "license": "MIT",
